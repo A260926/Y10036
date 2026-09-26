@@ -1,0 +1,25 @@
+{
+  "cSpell.words": [
+    "endregion",
+    "escodegen",
+    "estree",
+    "finalizer",
+    "identifier's",
+    "meriyah",
+    "nocheck",
+    "nodepath",
+    "quasis"
+  ],
+  "files.associations": {
+    "*.tsconfig.json": "jsonc"
+  },
+  "json.schemas": [
+    {
+      "fileMatch": [
+        "*.tsconfig.json"
+      ],
+      "url": "https://json.schemastore.org/tsconfig"
+    }
+  ],
+  "typescript.tsdk": "node_modules\\typescript\\lib",
+}

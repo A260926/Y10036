@@ -1,0 +1,174 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`methods crawl manages references when re-crawling 1`] = `
+"let a, b;
+c = 0;
+block1: for (let y of z) {
+  a = 5;
+  b = 6;
+  a = 6;
+  b = 7;
+  a = 7;
+  b = 8;
+  a = 8;
+  b = 9;
+  {
+    a = b = 77;
+    a.x;
+    b.x;
+    rec;
+  }
+}
+"
+`;
+
+exports[`methods generateDeclaredUidIdentifier ArrowFunctionExpression 1`] = `
+"(() => {
+  var idt, idt2, idt3;
+  return 0;
+});
+(() => {
+  var idt4, idt5, idt6;
+});
+"
+`;
+
+exports[`methods generateDeclaredUidIdentifier CatchClause, FunctionDeclaration, FunctionExpression 1`] = `
+"try {} catch (e) {
+  var idt, idt2, idt3;
+}
+function Fn() {
+  var idt4, idt5, idt6;
+}
+(function () {
+  var idt7, idt8, idt9;
+});
+"
+`;
+
+exports[`methods generateDeclaredUidIdentifier DoWhileStatement, ForInStatement, ForOfStatement, ForStatement, WhileStatement 1`] = `
+"do {
+  var idt, idt2, idt3;
+  f();
+} while (1);
+for (let x in y) {
+  var idt4, idt5, idt6;
+  f(x);
+}
+for (let x of y) {
+  var idt7, idt8, idt9;
+  f(x);
+}
+for (; ; ) {
+  var idt10, idt11, idt12;
+  f();
+}
+while (1) {
+  var idt13, idt14, idt15;
+  f();
+}
+do {
+  var idt16, idt17, idt18;
+  f();
+} while (1);
+for (let x in y) {
+  var idt19, idt20, idt21;
+  f(x);
+}
+for (let x of y) {
+  var idt22, idt23, idt24;
+  f(x);
+}
+for (; ; ) {
+  var idt25, idt26, idt27;
+  f();
+}
+while (1) {
+  var idt28, idt29, idt30;
+  f();
+}
+"
+`;
+
+exports[`methods generateDeclaredUidIdentifier Program, BlockStatement 1`] = `
+"var idt, idt2, idt3;
+{
+  var idt4, idt5, idt6;
+}
+"
+`;
+
+exports[`methods generateDeclaredUidIdentifier SwitchStatement, ClassDeclaration, ClassExpression 1`] = `
+"{
+  var idt, idt2, idt3;
+  switch (0) {
+    default:
+      {}
+  }
+}
+{
+  var idt4, idt5, idt6;
+  class Cls {}
+}
+{
+  (() => {
+    var idt7, idt8, idt9;
+    return class {};
+  });
+}
+"
+`;
+
+exports[`methods getAllBindings all kind 1`] = `
+"const a = 0;
+const b = 0;
+{
+  const a = 22;
+  const c = 0;
+  const x = d => {
+    it;
+  };
+}
+"
+`;
+
+exports[`methods rename Common binding 1`] = `
+"const c = obj;
+f(c);
+let x = (b = c) => b;
+"
+`;
+
+exports[`methods rename Import-Export 1`] = `
+"import {a as e} from ".";
+export {e as a};
+import f from ".";
+export {f as x};
+"
+`;
+
+exports[`methods rename Patterns 1`] = `
+"const {a: b} = global;
+rep_a_b;
+({a: b} = newGlobal);
+const x = ({d: e, y: [g], h: i = 1} = b) => {
+  rep_d_e;
+  rep_f_g;
+  rep_h_i;
+};
+"
+`;
+
+exports[`methods rename Replace binding in parent scope 1`] = `
+"import {a as e} from ".";
+{
+  {
+    const f = 0;
+    {
+      const c = 0;
+      rep;
+    }
+  }
+}
+"
+`;

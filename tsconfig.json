@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "module": "CommonJS",
+    "target": "ES2018",
+    "strict": true,
+    "declaration": true,
+    "lib": ["ES2018"]
+  },
+  "include": [
+    "./src/**/*"
+  ],
+  "ts-node": {
+    "transpileOnly": true,
+    "compilerOptions": {
+      "esModuleInterop": true
+    }
+  }
+}

@@ -1,0 +1,24 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@4.1.0
+
+jobs:
+  test:
+    executor:
+      name: node/default
+      tag: '20.5.1'
+    steps:
+      - checkout
+      - node/install-packages
+      - run:
+          name: Run tests
+          command: npm run test:ci
+      - run:
+          name: Upload coverage report
+          command: bash <(curl -s https://codecov.io/bash)
+
+workflows:
+  run_tests:
+    jobs:
+      - test
