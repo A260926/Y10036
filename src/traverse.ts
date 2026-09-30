@@ -220,22 +220,25 @@ export class Traverser {
     const prevNodeValidationEnabled = getNodeValidationEnabled()
     setNodeValidationEnabled(data.ctx.shouldValidateNodes)
 
-    new Traverser(
-      data.expand ? this.expandVisitors(data.visitors) : data.visitors
-    ).visitPath(
-      visitorCtx,
-      NodePath.for({
-        node: data.node,
-        key: null,
-        listKey: null,
-        parentPath: data.parentPath,
-        ctx: data.ctx
-      }),
-      data.state,
-      new WeakSet(),
-      data.visitOnlyChildren
-    )
-
+    try {
+      new Traverser(
+        data.expand ? this.expandVisitors(data.visitors) : data.visitors
+      ).visitPath(
+        visitorCtx,
+        NodePath.for({
+          node: data.node,
+          key: null,
+          listKey: null,
+          parentPath: data.parentPath,
+          ctx: data.ctx
+        }),
+        data.state,
+        new WeakSet(),
+        data.visitOnlyChildren
+      )
+    } finally {
+      setNodeValidationEnabled(prevNodeValidationEnabled)
+    }
   }
 }
 

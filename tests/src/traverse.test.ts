@@ -1,5 +1,5 @@
 import { NodePath, traverse, builders as b } from '<project>'
-import { getNodeValidationEnabled } from '<project>/builders'
+import { getNodeValidationEnabled, setNodeValidationEnabled } from '<project>/builders'
 
 test('basic traversal', () => {
   const ast = {
@@ -473,4 +473,172 @@ test('enabling/disabling node validation and restoring node validation state', (
   })
 
   expect(getNodeValidationEnabled()).toBe(wasValidationEnabled)
+})
+
+describe('restoring node validation state', () => {
+  const programNode = () => ({
+    type: 'Program',
+    sourceType: 'module',
+    body: [
+      {
+        type: 'ExpressionStatement',
+        expression: {
+          type: 'Identifier',
+          name: 'a'
+        }
+      }
+    ]
+  })
+
+  test('restores the previous state when a visitor throws, without wrapping the error', () => {
+    setNodeValidationEnabled(true)
+    const visitorError = new Error('boom')
+
+    expect(() => traverse(programNode(), {
+      $: { validateNodes: false },
+      Identifier() {
+        expect(getNodeValidationEnabled()).toBe(false)
+        throw visitorError
+      }
+    })).toThrow(visitorError)
+
+    // An unrelated builder after the failed traverse keeps validating nodes
+    expect(() => b.identifier(null)).toThrow()
+    expect(getNodeValidationEnabled()).toBe(true)
+
+    expect(() => traverse(programNode(), {
+      $: { validateNodes: false },
+      Identifier() {
+        throw visitorError
+      }
+    })).toThrow(visitorError)
+
+    // Rethrowing must reuse the same error object (stack is not rebuilt)
+    let caughtError: unknown
+    try {
+      traverse(programNode(), {
+        $: { validateNodes: false },
+        Identifier() {
+          throw visitorError
+        }
+      })
+    } catch (error) {
+      caughtError = error
+    }
+    expect(caughtError).toBe(visitorError)
+    expect((caughtError as Error).stack).toBe(visitorError.stack)
+  })
+
+  test('restores the outer state when a nested traverse throws', () => {
+    setNodeValidationEnabled(true)
+    const innerError = new Error('inner boom')
+
+    expect(() => traverse(programNode(), {
+      $: { validateNodes: false },
+      Program(path) {
+        expect(() => b.identifier(null)).not.toThrow()
+
+        expect(() => traverse(path.node, {
+          $: { validateNodes: true },
+          Identifier() {
+            expect(getNodeValidationEnabled()).toBe(true)
+            throw innerError
+          }
+        })).toThrow(innerError)
+
+        // Inner traverse failure must not leak its setting into the outer one
+        expect(() => b.identifier(null)).not.toThrow()
+        expect(getNodeValidationEnabled()).toBe(false)
+      }
+    })).not.toThrow()
+
+    expect(() => b.identifier(null)).toThrow()
+    expect(getNodeValidationEnabled()).toBe(true)
+  })
+
+  test('propagates a nested traverse error without swallowing it', () => {
+    setNodeValidationEnabled(true)
+    const innerError = new Error('uncaught inner boom')
+
+    let codeAfterInnerTraverse = false
+    expect(() => traverse(programNode(), {
+      $: { validateNodes: false },
+      ExpressionStatement(path) {
+        path.traverse({
+          Identifier() {
+            throw innerError
+          }
+        })
+        codeAfterInnerTraverse = true
+      }
+    })).toThrow(innerError)
+
+    expect(codeAfterInnerTraverse).toBe(false)
+
+    let caughtError: unknown
+    try {
+      traverse(programNode(), {
+        $: { validateNodes: false },
+        ExpressionStatement(path) {
+          path.traverse({
+            Identifier() {
+              throw innerError
+            }
+          })
+        }
+      })
+    } catch (error) {
+      caughtError = error
+    }
+    expect(caughtError).toBe(innerError)
+    expect((caughtError as Error).stack).toBe(innerError.stack)
+    expect(() => b.identifier(null)).toThrow()
+    expect(getNodeValidationEnabled()).toBe(true)
+  })
+
+  test('restores the previous state when a nested traverse on a path throws', () => {
+    setNodeValidationEnabled(true)
+    const innerError = new Error('path boom')
+
+    expect(() => traverse(programNode(), {
+      $: { validateNodes: false },
+      ExpressionStatement(path) {
+        expect(() => path.traverse({
+          Identifier() {
+            throw innerError
+          }
+        })).toThrow(innerError)
+
+        // The nested path traverse shares the outer context setting
+        expect(getNodeValidationEnabled()).toBe(false)
+        expect(() => b.identifier(null)).not.toThrow()
+      }
+    })).not.toThrow()
+
+    expect(getNodeValidationEnabled()).toBe(true)
+  })
+
+  test('restores the previous state after traversal is stopped early', () => {
+    setNodeValidationEnabled(true)
+
+    traverse(programNode(), {
+      $: { validateNodes: false },
+      Identifier() {
+        this.stop()
+      }
+    })
+
+    expect(() => b.identifier(null)).toThrow()
+    expect(getNodeValidationEnabled()).toBe(true)
+
+    setNodeValidationEnabled(false)
+    traverse(programNode(), {
+      $: { validateNodes: true },
+      Identifier() {
+        this.stop()
+      }
+    })
+    expect(getNodeValidationEnabled()).toBe(false)
+    setNodeValidationEnabled(true)
+  })
 })
