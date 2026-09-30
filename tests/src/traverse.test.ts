@@ -1,5 +1,5 @@
 import { NodePath, traverse, builders as b } from '<project>'
-import { getNodeValidationEnabled } from '<project>/builders'
+import { getNodeValidationEnabled, setNodeValidationEnabled } from '<project>/builders'
 
 test('basic traversal', () => {
   const ast = {
@@ -473,4 +473,165 @@ test('enabling/disabling node validation and restoring node validation state', (
   })
 
   expect(getNodeValidationEnabled()).toBe(wasValidationEnabled)
+})
+
+describe('restoring node validation state on abrupt exits', () => {
+  const makeProgram = () => ({
+    type: 'Program',
+    sourceType: 'module',
+    body: []
+  } as const)
+
+  beforeEach(() => {
+    // Start each case from the default global state so a leak
+    // from a previous case can not mask a leak in the current one
+    setNodeValidationEnabled(true)
+  })
+
+  afterEach(() => {
+    setNodeValidationEnabled(true)
+  })
+
+  test('visitor throw restores validation state and rethrows the original error', () => {
+    const originalError = new Error('visitor boom')
+    let caught: unknown
+
+    try {
+      traverse(makeProgram(), {
+        $: { validateNodes: false },
+        Program() {
+          // Validation is disabled inside this traversal
+          expect(() => b.identifier(null)).not.toThrow()
+          throw originalError
+        }
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    // The exact same error object (and its stack) must propagate, unwrapped
+    expect(caught).toBe(originalError)
+    expect((caught as Error).stack).toContain('visitor boom')
+
+    // The global switch is back to the entry state, so an unrelated
+    // builder call after the failed traversal validates again
+    expect(getNodeValidationEnabled()).toBe(true)
+    expect(() => b.identifier(null)).toThrow()
+  })
+
+  test('inner traverse throw restores the outer traversal state', () => {
+    const innerError = new Error('inner boom')
+    let caught: unknown
+
+    try {
+      traverse(makeProgram(), {
+        $: { validateNodes: false },
+        Program(p) {
+          expect(() => b.identifier(null)).not.toThrow()
+
+          try {
+            traverse(p.node, {
+              $: { validateNodes: true },
+              Program() {
+                expect(() => b.identifier(null)).toThrow()
+                throw innerError
+              }
+            })
+          } catch (error) {
+            caught = error
+          }
+
+          // The outer traversal's disabled state is restored, not the
+          // inner traversal's enabled one
+          expect(getNodeValidationEnabled()).toBe(false)
+          expect(() => b.identifier(null)).not.toThrow()
+        }
+      })
+    } catch {
+      // The outer traversal must not throw here
+      throw new Error('inner error leaked into outer traversal')
+    }
+
+    expect(caught).toBe(innerError)
+    expect(getNodeValidationEnabled()).toBe(true)
+    expect(() => b.identifier(null)).toThrow()
+  })
+
+  test('nested traverse throw propagates through both levels with state restored', () => {
+    const innerError = new Error('nested boom')
+    let caught: unknown
+
+    try {
+      traverse(makeProgram(), {
+        $: { validateNodes: false },
+        Program(p) {
+          traverse(p.node, {
+            $: { validateNodes: true },
+            Program() {
+              throw innerError
+            }
+          })
+        }
+      })
+    } catch (error) {
+      caught = error
+    }
+
+    // The original error propagates through both traversals unwrapped
+    expect(caught).toBe(innerError)
+    expect(getNodeValidationEnabled()).toBe(true)
+    expect(() => b.identifier(null)).toThrow()
+  })
+
+  test('early stop restores validation state', () => {
+    const ast = {
+      type: 'Program',
+      sourceType: 'module',
+      body: [
+        {
+          type: 'ExpressionStatement',
+          expression: {
+            type: 'Identifier',
+            name: 'a'
+          }
+        }
+      ]
+    } as const
+    const mockFn = jest.fn()
+
+    traverse(ast, {
+      $: { validateNodes: false },
+      Program() {
+        expect(() => b.identifier(null)).not.toThrow()
+        this.stop()
+      },
+      Identifier: mockFn
+    })
+
+    expect(mockFn).toHaveBeenCalledTimes(0)
+    expect(getNodeValidationEnabled()).toBe(true)
+    expect(() => b.identifier(null)).toThrow()
+  })
+
+  test('stop inside nested traverse restores each level state', () => {
+    traverse(makeProgram(), {
+      $: { validateNodes: false },
+      Program(p) {
+        traverse(p.node, {
+          $: { validateNodes: true },
+          Program() {
+            expect(() => b.identifier(null)).toThrow()
+            this.stop()
+          }
+        })
+
+        // Inner stop restored the outer (disabled) state
+        expect(getNodeValidationEnabled()).toBe(false)
+        expect(() => b.identifier(null)).not.toThrow()
+      }
+    })
+
+    expect(getNodeValidationEnabled()).toBe(true)
+    expect(() => b.identifier(null)).toThrow()
+  })
 })

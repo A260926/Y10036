@@ -1,3 +1,43 @@
+## Unreleased
+- Fix global node-validation switch leaking after an abrupt traversal exit.
+  `Traverser.traverseNode` (src/traverse.ts) temporarily switches the global
+  `builders` validation flag via `setNodeValidationEnabled` and previously
+  never restored it, so a visitor throwing inside `traverse(..., { $: {
+  validateNodes: false } })` left validation disabled for every later,
+  unrelated builder call.
+
+  Structural choice: the fix lives in the single shared choke point
+  `Traverser.traverseNode`, which is used by `traverse`, `NodePath.traverse`
+  and the scope crawler, so all entry points (including nested traversals)
+  are covered by one `try/finally` that restores the exact value captured on
+  entry. The previous value is restored rather than a hardcoded default,
+  which is what makes nested traversals with different `validateNodes`
+  settings compose correctly. The traversal itself is not wrapped, so the
+  original error object and its stack propagate untouched.
+
+  Previous coverage gap: the existing test "enabling/disabling node
+  validation and restoring node validation state" only exercised the normal
+  completion path; no test covered a visitor throwing, an inner traversal
+  throwing, or an early `stop()`.
+
+  Most dangerous counterexample: a nested traversal where the inner
+  `traverse` uses `{ validateNodes: true }` and its visitor throws. A naive
+  "reset to default" fix would restore the wrong value (`true`) and silently
+  re-enable validation inside the outer `{ validateNodes: false }`
+  traversal. This is locked by the test "inner traverse throw restores the
+  outer traversal state" in tests/src/traverse.test.ts, together with
+  "visitor throw restores validation state and rethrows the original error"
+  (error identity/stack + later builders validate again), "nested traverse
+  throw propagates through both levels with state restored", "early stop
+  restores validation state" and "stop inside nested traverse restores each
+  level state".
+
+  Intentionally preserved public behavior: the global flag is still switched
+  for the duration of a traversal (builders called synchronously inside
+  visitors keep honoring `$.validateNodes`), `stop()` still performs a
+  normal early exit, and errors thrown by visitors are rethrown as the exact
+  original object without wrapping or added context.
+
 ## 1.7.14
 - New binding kind added - `using` and `await using`
 - Updated dependencies
